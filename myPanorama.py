@@ -383,7 +383,7 @@ def generatePanorama4():
     h, maxInlier = ransacHomography(pos1, pos2, 1000, 1)
     rH.append(h)
 
-    #out = displayMatches(img1, img2, pos1, pos2, maxInlier)
+    out = displayMatches(img1, img2, pos1, pos2, maxInlier)
     imList =[img1c,img2c,img3c]
     Hs = accumulateHomographies(rH, math.ceil(len(imList) / 2)- 1)
     #print(Hs)
@@ -467,7 +467,7 @@ def generatePanorama6():
     h, maxInlier = ransacHomography(pos1, pos2, 1000, 1)
     rH.append(h)
 
-    #out = displayMatches(img1, img2, pos1, pos2, maxInlier)# here it's to big
+    out = displayMatches(img1, img2, pos1, pos2, maxInlier)# here it's to big
     imList =[img1c,img2c,img3c]
     Hs = accumulateHomographies(rH, math.ceil(len(imList) / 2)- 1)
     #print(Hs)
@@ -510,14 +510,15 @@ def generatePanorama7():
         h, maxInlier = ransacHomography(pos1, pos2, 1000, 1)
         rH.append(h)
 
-        # out = displayMatches(imagesGray[k], imagesGray[k+1], pos1, pos2, maxInlier)
+        out = displayMatches(imagesGray[k], imagesGray[k+1], pos1, pos2, maxInlier)
         counter += 1
     # imList = [img1c, img2c, img3c]
     Hs = accumulateHomographies(rH, math.ceil(LenimagesGray / 2) - 1)
     # print(Hs)
     out = renderPanorama(imagesGBR, Hs)
-    cv2.imwrite("output.jpg", out)
-    plt.imshow(out)
+    im_rgb = cv2.cvtColor(out, cv2.COLOR_BGR2RGB)
+    cv2.imwrite("output.jpg", im_rgb)
+    plt.imshow(im_rgb)
     plt.show()
 
 #generatePanorama7()
@@ -553,14 +554,15 @@ def generatePanorama(path):
         h, maxInlier = ransacHomography(pos1, pos2, 1000, 1)
         rH.append(h)
 
-        #out = displayMatches(imagesGray[k], imagesGray[k+1], pos1, pos2, maxInlier)
+        out = displayMatches(imagesGray[k], imagesGray[k+1], pos1, pos2, maxInlier)
         counter += 1
     # imList = [img1c, img2c, img3c]
     Hs = accumulateHomographies(rH, math.ceil(LenimagesGray / 2) - 1)
     # print(Hs)
     out = renderPanorama(imagesGBR, Hs)
-    cv2.imwrite("output.jpg", out)
-    plt.imshow(out)
+    im_rgb = cv2.cvtColor(out, cv2.COLOR_BGR2RGB)
+    cv2.imwrite("output.jpg", im_rgb)
+    plt.imshow(im_rgb)
     plt.show()
 
 def main():
