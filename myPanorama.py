@@ -5,7 +5,20 @@ import random
 import matplotlib.pyplot as plt
 #import datetime
 import math
-
+import os
+from collections import OrderedDict
+def readImg (path,flag):
+    images = []
+    filename = ""
+    Dict = OrderedDict()
+    for fileName in os.listdir(path):
+        if filename is None:
+            filename = fileName[:-5]
+        img = cv2.imread(os.path.join(path, fileName), flag)
+        if img is not None:
+            images.append(img)
+    Dict.setdefault(filename, []).extend(images)
+    return Dict
 def ssd(a, b):
     return np.sqrt(np.sum((a - b) ** 2)) / len(a)
 def findFeatures(img):
@@ -282,7 +295,7 @@ def generatePanorama1():
     plt.imshow(im_rgb)
     plt.show()
 
-generatePanorama1()
+#generatePanorama1()
 
 def generatePanorama2():
     # test2:
@@ -311,7 +324,7 @@ def generatePanorama2():
     plt.imshow(im_rgb)
     plt.show()
 
-generatePanorama2()
+#generatePanorama2()
 
 def generatePanorama3():
     # test3:
@@ -340,7 +353,7 @@ def generatePanorama3():
     plt.imshow(im_rgb)
     plt.show()
 
-generatePanorama3()
+#generatePanorama3()
 
 def generatePanorama4():
     #test 4
@@ -379,7 +392,7 @@ def generatePanorama4():
     plt.imshow(out)
     plt.show()
 
-generatePanorama4()
+#generatePanorama4()
 
 def generatePanorama5():
 
@@ -418,7 +431,7 @@ def generatePanorama5():
     plt.imshow(im_rgb)
     plt.show()
 
-generatePanorama5()
+#generatePanorama5()
 
 def generatePanorama6():
 
@@ -464,4 +477,98 @@ def generatePanorama6():
     plt.imshow(im_rgb)
     plt.show()
 
-generatePanorama6()
+#generatePanorama6()
+
+def generatePanorama7():
+    path = "C:\im"
+    imaGbr = readImg(path, cv2.IMREAD_COLOR)
+    imGray = readImg(path, cv2.IMREAD_GRAYSCALE)
+
+    for imgKey in imGray:
+        counter = 1
+        imagesGBR = imaGbr[imgKey]
+        imagesGray = imGray[imgKey]
+        LenimagesGray = len(imagesGray)
+
+    for k in range(LenimagesGray - 1):
+        fileName = imgKey + str(counter)
+
+        kp1, desc1 = findFeatures(imagesGray[k])
+        kp2, desc2 = findFeatures(imagesGray[k + 1])
+        # kp3, desc3 = findFeatures(img3)
+
+        pos1, pos2 = matchFeatures(kp1, kp2, desc1, desc2)
+        pos1 = np.asarray(pos1)
+        pos2 = np.asarray(pos2)
+        h, maxInlier = ransacHomography(pos1, pos2, 1000, 1)
+        rH = []
+        rH.append(h)
+        # FOR 3 PIC:
+        # pos1, pos2 = matchFeatures(kp2, kp3, desc2, desc3)
+        pos1 = np.asarray(pos1)
+        pos2 = np.asarray(pos2)
+        h, maxInlier = ransacHomography(pos1, pos2, 1000, 1)
+        rH.append(h)
+
+        # out = displayMatches(img1, img2, pos1, pos2, maxInlier)
+        counter += 1
+    # imList = [img1c, img2c, img3c]
+    Hs = accumulateHomographies(rH, math.ceil(LenimagesGray / 2) - 1)
+    # print(Hs)
+    out = renderPanorama(imagesGBR, Hs)
+    cv2.imwrite("output.jpg", out)
+    plt.imshow(out)
+    plt.show()
+
+#generatePanorama7()
+
+def generatePanorama(path):
+    #path = "C:\im"
+    imaGbr = readImg(path, cv2.IMREAD_COLOR)
+    imGray = readImg(path, cv2.IMREAD_GRAYSCALE)
+
+    for imgKey in imGray:
+        counter = 1
+        imagesGBR = imaGbr[imgKey]
+        imagesGray = imGray[imgKey]
+        LenimagesGray = len(imagesGray)
+
+    for k in range(LenimagesGray - 1):
+        fileName = imgKey + str(counter)
+
+        kp1, desc1 = findFeatures(imagesGray[k])
+        kp2, desc2 = findFeatures(imagesGray[k + 1])
+        # kp3, desc3 = findFeatures(img3)
+
+        pos1, pos2 = matchFeatures(kp1, kp2, desc1, desc2)
+        pos1 = np.asarray(pos1)
+        pos2 = np.asarray(pos2)
+        h, maxInlier = ransacHomography(pos1, pos2, 1000, 1)
+        rH = []
+        rH.append(h)
+        # FOR 3 PIC:
+        # pos1, pos2 = matchFeatures(kp2, kp3, desc2, desc3)
+        pos1 = np.asarray(pos1)
+        pos2 = np.asarray(pos2)
+        h, maxInlier = ransacHomography(pos1, pos2, 1000, 1)
+        rH.append(h)
+
+        # out = displayMatches(img1, img2, pos1, pos2, maxInlier)
+        counter += 1
+    # imList = [img1c, img2c, img3c]
+    Hs = accumulateHomographies(rH, math.ceil(LenimagesGray / 2) - 1)
+    # print(Hs)
+    out = renderPanorama(imagesGBR, Hs)
+    cv2.imwrite("output.jpg", out)
+    plt.imshow(out)
+    plt.show()
+
+if _name_ == '_main_':
+    generatePanorama('C:\im') #give folder with pic to work on
+    # generatePanorama1()
+    # generatePanorama2()
+    # generatePanorama3()
+    # generatePanorama4()
+    # generatePanorama5()
+    # generatePanorama6()
+    # generatePanorama7() #with givan path
