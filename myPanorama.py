@@ -1,11 +1,9 @@
 import cv2
 import numpy as np
-import getopt
 import sys
 import random
 import matplotlib.pyplot as plt
-import glob
-import datetime
+#import datetime
 import math
 
 def ssd(a, b):
@@ -14,14 +12,13 @@ def findFeatures(img):
     print("Finding Features...")
     #sift = cv2.SIFT()
     #sift = cv2.xfeatures2d.SIFT_create()
+    # find the keypoints and descriptors with ORB
     #keypoints, descriptors = sift.detectAndCompute(img, None)
-    # print("kkkkk",keypoints)
+    # cv2.imwrite('sift_keypoints.png', img)
     orb = cv2.ORB_create()
-    # find the keypoints and descriptors with SIFT
+    # find the keypoints and descriptors with ORB
     keypoints, descriptors = orb.detectAndCompute(img, None)
     #img = cv2.drawKeypoints(img, keypoints, None)
-    #cv2.imwrite('sift_keypoints.png', img)
-    # print("pppp",keypoints[0].pt)
     return keypoints, descriptors
 def applyHomographyP(xy, H):
     # per point
@@ -141,18 +138,15 @@ def ransacHomography(pos1, pos2, numIters, inlierTol):
         rnd_indx = np.random.choice(numRows, 4, replace=False)
         for r in rnd_indx:
             correspondenceList.append([pos1[r], pos2[r]])
-            # print(correspondenceList)
         # call the homography function on those points
         h = calculateHomography(correspondenceList)
         inliers_list = []
 
         for j in range(len(pos2)):
             esP2 = applyHomographyP(pos1[j], h)  # pos1 to pos2 transform
-            #error = (pos2[j] - esP2)
-            # error = np.linalg.norm(error)
-            # print(error)
+
             d = ((((pos2[j][0] - esP2[0]) ** 2) + ((pos2[j][1] - esP2[1]) ** 2)) ** 0.5)
-            # print(d)
+
             if d < inlierTol:
                 inliers_list.append(j)
 
@@ -192,109 +186,282 @@ def displayMatches(img1,img2,pos1,pos2,inlind):
     cv2.waitKey(0)
     cv2.destroyAllWindows()
     return out
+def trim(frame):
+    # trims the black residue in the panorama image from
+    #https://pylessons.com/OpenCV-image-stiching-continue/
+    #crop top
+    if not np.sum(frame[0]):
+        return trim(frame[1:])
+    #crop bottom
+    elif not np.sum(frame[-1]):
+        return trim(frame[:-2])
+    #crop left
+    elif not np.sum(frame[:,0]):
+        return trim(frame[:,1:])
+        #crop right
+    elif not np.sum(frame[:,-1]):
+        return trim(frame[:,:-2])
+    return frame
+def accumulateHomographies(Hpair, m):
+    HpairLen=len(Hpair)+1
+    htot = [np.ones((3, 3))] * (HpairLen)
+    for i in range(HpairLen):
+        if i == m:
+            htot[i] = np.eye(3)
+        elif i < m:
+            for ind in range(i, m):
+                htot[i] = htot[i].dot(Hpair[ind])
+        elif i > m:
+            for ind in range(m, i):
+                htot[i] = htot[i].dot(np.linalg.inv(Hpair[ind]))
+    return htot
+def renderPanorama( imList , Hs):
+    warpedImages = []
+    for i in range(len(imList)):
+        img = imList[i]
+        warped = cv2.warpPerspective(img, Hs[i], (img.shape[1], img.shape[0]))
+        warped[0:img.shape[0],0:img.shape[1]] = img
+        warpedImages.append(warped)
+    stitcherO = cv2.Stitcher_create()
+    (state, panorama) = stitcherO.stitch(warpedImages)
+    if state != 0: # ==0 -> didnt work
+        panorama = None
+    return trim(panorama)
 
-def accumulateHomographies (Hpair, m):
-    HpairLen = len(Hpair) + 1
-    Htot = np.array([1, HpairLen])
-    Htot[m] = np.eye(3)
-    for i in range(m - 1, 1, -1):
-        Hi = np.dot(Htot[i + 1], Htot[i])
-        Hi = (1 / Hi[3, 3]) * Hi
-        Htot[i] = Hi
-    for i in range(m, HpairLen - 1):
-        Hi = Htot[i] / Hpair[i]
-        Hi = (1 / Hi[3, 3]) * Hi
-        Htot[i + 1] = Hi
-    # print("htot", Htot)
-    return Htot
-
-def renderPanorama(im, H):
-    imLen = len(im)
-    minX = sys.maxsize
-    minY = sys.maxsize
-    maxX = 0
-    maxY = 0
-    for i in range(imLen):
-        edges = np.array([[0, 0], [0, im[i].shape[0]], [im[i].shape[1], 0], [im[i].shape[1], im[i].shape[0]]])
-        print(edges)
-        t=[]
-        for k in range(len(edges)):
-            #print(edges[k])
-            #print(H[i])
-            t.append(applyHomographyP(edges[k], H[i]) )
-            print(t)
-        # finf minimux x
-        for i in range(len(t)):
-            #print(i)
-            print(t[i])
-            if t[i][0] < minX:
-                minX = t[i][0]
-            elif t[i][0] > maxX:
-                maxX = t[i][0]
-            elif t[i][1] < minY:
-                minY = t[0][1]
-            elif t[i][1] > maxY:
-                maxY = t[i][1]
-
-    w = int(maxX - minX)
-    h = int(maxY - minY)
-    print(w,h)
-    Ipano = np.zeros((h*len(im),w*len(im)))
-####
-    list_of_pix=[]
-    for n in range(len(im)):
-        for i in range(im[n].shape[0]):
-            for j in range(im[n].shape[1]):
-                point=(i,j)
-                print(point)
-
-                coord = applyHomographyP(point, (H[i]))
-                val=im[n][i][j]
-                pix=[coord,val]
-                list_of_pix.append(pix)
-    list_of_pix.sort(pix[0])
-    index=0
-    for i in range(h):
-        for j in range(w):
-            if (i,j) ==list_of_pix[index][0]:
-                Ipano[i][j]=list_of_pix[index][1]
-            else:
-                Ipano[i][j]=255
-    return Ipano
-
-
-def generatePanorama():
-    img1c = cv2.cvtColor(cv2.imread('backyard2.jpg'), cv2.COLOR_BGR2RGB) / 255
-    img1 = cv2.cvtColor(cv2.imread('backyard2.jpg'), cv2.COLOR_BGR2GRAY)
-    # img2=cv2.imread("backyard2.jpg", 0)
-    img2c = cv2.cvtColor(cv2.imread('backyard1.jpg'), cv2.COLOR_BGR2RGB) / 255
-    img2 = cv2.cvtColor(cv2.imread('backyard1.jpg'), cv2.COLOR_BGR2GRAY)
+#tests:
+def generatePanorama1():
+    """ not working with cv2.Stitcher
+    img1c = cv2.cvtColor(cv2.imread('right.jpeg',3)  , cv2.COLOR_BGR2RGB) / 255
+    img1 = cv2.cvtColor(cv2.imread('right.jpeg',0) , cv2.COLOR_BGR2GRAY)
+    """
+    #test 1
+    img1c = cv2.imread('backyard3.jpg',3)
+    img1 = cv2.imread('backyard3.jpg', 0)
+    img2c = cv2.imread('backyard2.jpg', 3)
+    img2 = cv2.imread('backyard2.jpg', 0)
+    img3c = cv2.imread('backyard1.jpg', 3)
+    img3 = cv2.imread('backyard1.jpg', 0)
 
     kp1, desc1 = findFeatures(img1)
     kp2, desc2 = findFeatures(img2)
+    kp3, desc3 = findFeatures(img3)
+
     pos1, pos2 = matchFeatures(kp1, kp2, desc1, desc2)
     pos1 = np.asarray(pos1)
     pos2 = np.asarray(pos2)
     h,maxInlier = ransacHomography(pos1, pos2,1000,1)
 
     ##parspctive use
-    dst = cv2.warpPerspective(img1c, h, (img2c.shape[1] + img1c.shape[1], img2c.shape[0]))  # img2 left to img1
+    #dst = cv2.warpPerspective(img1c, h, (img2c.shape[1] + img1c.shape[1], img2c.shape[0]))  # img2 left to img1
     #  #dst = cv2.warpPerspective(img1,H,(img2.shape[0],img2.shape[1] + img1.shape[1]))
-    plt.subplot(122), plt.imshow(dst), plt.title("Warped Image")
-    plt.show()
-    plt.figure()
-    dst[0:img2c.shape[0], 0:img2c.shape[1]] = img2c  # add bluring
-    cv2.imwrite("output.jpg", dst)
-    plt.imshow(dst)
-    plt.show()
-    print(h)
+    #plt.subplot(122), plt.imshow(dst), plt.title("Warped Image")
+    #plt.show()
+    #plt.figure()
+    #dst[0:img2c.shape[0], 0:img2c.shape[1]] = img2c  # add bluring
+    #dst=trim(dst)
+    #cv2.imwrite("output.jpg", dst)
+    #plt.imshow(dst)
+    #plt.show()
+    #print(h)
     rH=[]
     rH.append(h)
+    #FOR 3 PIC:
+    pos1, pos2 = matchFeatures(kp2, kp3, desc2, desc3)
+    pos1 = np.asarray(pos1)
+    pos2 = np.asarray(pos2)
+    h, maxInlier = ransacHomography(pos1, pos2, 1000, 1)
+    rH.append(h)
+
     out = displayMatches(img1, img2, pos1, pos2, maxInlier)
-    data=[img1c,img2c]
+    imList =[img1c,img2c,img3c]
+    Hs = accumulateHomographies(rH, math.ceil(len(imList) / 2)- 1)
+    #print(Hs)
+    out = renderPanorama(imList, Hs)
+    im_rgb = cv2.cvtColor(out, cv2.COLOR_BGR2RGB)
+    cv2.imwrite("output.jpg", im_rgb)
+    plt.imshow(im_rgb)
+    plt.show()
 
-    Hs = accumulateHomographies1(rH, math.ceil(len(data) / 2))
-    print(Hs)
+generatePanorama1()
 
+def generatePanorama2():
+    # test2:
+    img1c = cv2.imread('neilR.jpg', 3)
+    img1 = cv2.imread('neilR.jpg', 0)
+    img2c = cv2.imread('neilL.jpg', 3)
+    img2 = cv2.imread('neilL.jpg', 0)
 
-generatePanorama()
+    kp1, desc1 = findFeatures(img1)
+    kp2, desc2 = findFeatures(img2)
+
+    pos1, pos2 = matchFeatures(kp1, kp2, desc1, desc2)
+    pos1 = np.asarray(pos1)
+    pos2 = np.asarray(pos2)
+    h, maxInlier = ransacHomography(pos1, pos2, 1000, 1)
+
+    rH = []
+    rH.append(h)
+    out = displayMatches(img1, img2, pos1, pos2, maxInlier)
+    imList = [img1c, img2c]
+    Hs = accumulateHomographies(rH, math.ceil(len(imList) / 2) - 1)
+    # print(Hs)
+    out = renderPanorama(imList, Hs)
+    im_rgb = cv2.cvtColor(out, cv2.COLOR_BGR2RGB)
+    cv2.imwrite("output.jpg", im_rgb)
+    plt.imshow(im_rgb)
+    plt.show()
+
+generatePanorama2()
+
+def generatePanorama3():
+    # test3:
+    img1c = cv2.imread('right.jpeg', 3)
+    img1 = cv2.imread('right.jpeg', 0)
+    img2c = cv2.imread('left.jpeg', 3)
+    img2 = cv2.imread('left.jpeg', 0)
+
+    kp1, desc1 = findFeatures(img1)
+    kp2, desc2 = findFeatures(img2)
+
+    pos1, pos2 = matchFeatures(kp1, kp2, desc1, desc2)
+    pos1 = np.asarray(pos1)
+    pos2 = np.asarray(pos2)
+    h, maxInlier = ransacHomography(pos1, pos2, 1000, 1)
+
+    rH = []
+    rH.append(h)
+    out = displayMatches(img1, img2, pos1, pos2, maxInlier)
+    imList = [img1c, img2c]
+    Hs = accumulateHomographies(rH, math.ceil(len(imList) / 2) - 1)
+    # print(Hs)
+    out = renderPanorama(imList, Hs)
+    im_rgb = cv2.cvtColor(out, cv2.COLOR_BGR2RGB)
+    cv2.imwrite("output.jpg", im_rgb)
+    plt.imshow(im_rgb)
+    plt.show()
+
+generatePanorama3()
+
+def generatePanorama4():
+    #test 4
+    img1c = cv2.imread('panL.jpg',3)
+    img1 = cv2.imread('panL.jpg', 0)
+    img2c = cv2.imread('panM.jpg', 3)
+    img2 = cv2.imread('panM.jpg', 0)
+    img3c = cv2.imread('panR.jpg', 3)
+    img3 = cv2.imread('panR.jpg', 0)
+
+    kp1, desc1 = findFeatures(img1)
+    kp2, desc2 = findFeatures(img2)
+    kp3, desc3 = findFeatures(img3)
+
+    pos1, pos2 = matchFeatures(kp1, kp2, desc1, desc2)
+    pos1 = np.asarray(pos1)
+    pos2 = np.asarray(pos2)
+    h,maxInlier = ransacHomography(pos1, pos2,1000,1)
+
+    rH=[]
+    rH.append(h)
+    #FOR 3 PIC:
+
+    pos1, pos2 = matchFeatures(kp2, kp3, desc2, desc3)
+    pos1 = np.asarray(pos1)
+    pos2 = np.asarray(pos2)
+    h, maxInlier = ransacHomography(pos1, pos2, 1000, 1)
+    rH.append(h)
+
+    #out = displayMatches(img1, img2, pos1, pos2, maxInlier)
+    imList =[img1c,img2c,img3c]
+    Hs = accumulateHomographies(rH, math.ceil(len(imList) / 2)- 1)
+    #print(Hs)
+    out = renderPanorama(imList, Hs)
+    cv2.imwrite("output.jpg", out)
+    plt.imshow(out)
+    plt.show()
+
+generatePanorama4()
+
+def generatePanorama5():
+
+    img1c = cv2.imread('lef.jpeg',3)
+    img1 = cv2.imread('lef.jpeg', 0)
+    img2c = cv2.imread('mid.jpeg', 3)
+    img2 = cv2.imread('mid.jpeg', 0)
+    img3c = cv2.imread('ret.jpeg', 3)
+    img3 = cv2.imread('ret.jpeg', 0)
+
+    kp1, desc1 = findFeatures(img1)
+    kp2, desc2 = findFeatures(img2)
+    kp3, desc3 = findFeatures(img3)
+
+    pos1, pos2 = matchFeatures(kp1, kp2, desc1, desc2)
+    pos1 = np.asarray(pos1)
+    pos2 = np.asarray(pos2)
+    h,maxInlier = ransacHomography(pos1, pos2,1000,1)
+
+    rH=[]
+    rH.append(h)
+    #FOR 3 PIC:
+    pos1, pos2 = matchFeatures(kp2, kp3, desc2, desc3)
+    pos1 = np.asarray(pos1)
+    pos2 = np.asarray(pos2)
+    h, maxInlier = ransacHomography(pos1, pos2, 1000, 1)
+    rH.append(h)
+
+    out = displayMatches(img1, img2, pos1, pos2, maxInlier)# here it's to big
+    imList =[img1c,img2c,img3c]
+    Hs = accumulateHomographies(rH, math.ceil(len(imList) / 2)- 1)
+    #print(Hs)
+    out = renderPanorama(imList, Hs)
+    im_rgb = cv2.cvtColor(out, cv2.COLOR_BGR2RGB)
+    cv2.imwrite("output.jpg", im_rgb)
+    plt.imshow(im_rgb)
+    plt.show()
+
+generatePanorama5()
+
+def generatePanorama6():
+
+    img1c = cv2.imread('office1.jpg',3)
+    img1 = cv2.imread('office1.jpg', 0)
+    img2c = cv2.imread('office2.jpg', 3)
+    img2 = cv2.imread('office2.jpg', 0)
+    img3c = cv2.imread('office3.jpg', 3)
+    img3 = cv2.imread('office3.jpg', 0)
+    img4c = cv2.imread('office4.jpg', 3)
+    img4 = cv2.imread('office4.jpg', 0)
+
+    kp1, desc1 = findFeatures(img1)
+    kp2, desc2 = findFeatures(img2)
+    kp3, desc3 = findFeatures(img3)
+    kp4, desc4 = findFeatures(img4)
+    pos1, pos2 = matchFeatures(kp1, kp2, desc1, desc2)
+    pos1 = np.asarray(pos1)
+    pos2 = np.asarray(pos2)
+    h,maxInlier = ransacHomography(pos1, pos2,1000,1)
+
+    rH=[]
+    rH.append(h)
+    #FOR 4 PIC:
+    pos1, pos2 = matchFeatures(kp2, kp3, desc2, desc3)
+    pos1 = np.asarray(pos1)
+    pos2 = np.asarray(pos2)
+    h, maxInlier = ransacHomography(pos1, pos2, 1000, 1)
+    rH.append(h)
+    pos1, pos2 = matchFeatures(kp3, kp4, desc3, desc4)
+    pos1 = np.asarray(pos1)
+    pos2 = np.asarray(pos2)
+    h, maxInlier = ransacHomography(pos1, pos2, 1000, 1)
+    rH.append(h)
+
+    #out = displayMatches(img1, img2, pos1, pos2, maxInlier)# here it's to big
+    imList =[img1c,img2c,img3c]
+    Hs = accumulateHomographies(rH, math.ceil(len(imList) / 2)- 1)
+    #print(Hs)
+    out = renderPanorama(imList, Hs)
+    im_rgb = cv2.cvtColor(out, cv2.COLOR_BGR2RGB)
+    cv2.imwrite("output.jpg", im_rgb)
+    plt.imshow(im_rgb)
+    plt.show()
+
+generatePanorama6()
