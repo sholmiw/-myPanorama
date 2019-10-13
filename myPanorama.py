@@ -291,7 +291,7 @@ def generatePanorama1():
     #print(Hs)
     out = renderPanorama(imList, Hs)
     im_rgb = cv2.cvtColor(out, cv2.COLOR_BGR2RGB)
-    cv2.imwrite("output.jpg", im_rgb)
+    cv2.imwrite("output1.jpg", im_rgb)
     plt.imshow(im_rgb)
     plt.show()
 
@@ -320,7 +320,7 @@ def generatePanorama2():
     # print(Hs)
     out = renderPanorama(imList, Hs)
     im_rgb = cv2.cvtColor(out, cv2.COLOR_BGR2RGB)
-    cv2.imwrite("output.jpg", im_rgb)
+    cv2.imwrite("output2.jpg", im_rgb)
     plt.imshow(im_rgb)
     plt.show()
 
@@ -349,7 +349,7 @@ def generatePanorama3():
     # print(Hs)
     out = renderPanorama(imList, Hs)
     im_rgb = cv2.cvtColor(out, cv2.COLOR_BGR2RGB)
-    cv2.imwrite("output.jpg", im_rgb)
+    cv2.imwrite("output3.jpg", im_rgb)
     plt.imshow(im_rgb)
     plt.show()
 
@@ -388,7 +388,7 @@ def generatePanorama4():
     Hs = accumulateHomographies(rH, math.ceil(len(imList) / 2)- 1)
     #print(Hs)
     out = renderPanorama(imList, Hs)
-    cv2.imwrite("output.jpg", out)
+    cv2.imwrite("output4.jpg", out)
     plt.imshow(out)
     plt.show()
 
@@ -427,7 +427,7 @@ def generatePanorama5():
     #print(Hs)
     out = renderPanorama(imList, Hs)
     im_rgb = cv2.cvtColor(out, cv2.COLOR_BGR2RGB)
-    cv2.imwrite("output.jpg", im_rgb)
+    cv2.imwrite("output5.jpg", im_rgb)
     plt.imshow(im_rgb)
     plt.show()
 
@@ -473,7 +473,7 @@ def generatePanorama6():
     #print(Hs)
     out = renderPanorama(imList, Hs)
     im_rgb = cv2.cvtColor(out, cv2.COLOR_BGR2RGB)
-    cv2.imwrite("output.jpg", im_rgb)
+    cv2.imwrite("output6.jpg", im_rgb)
     plt.imshow(im_rgb)
     plt.show()
 
@@ -510,7 +510,7 @@ def generatePanorama7():
         h, maxInlier = ransacHomography(pos1, pos2, 1000, 1)
         rH.append(h)
 
-        # out = displayMatches(img1, img2, pos1, pos2, maxInlier)
+        # out = displayMatches(imagesGray[k], imagesGray[k+1], pos1, pos2, maxInlier)
         counter += 1
     # imList = [img1c, img2c, img3c]
     Hs = accumulateHomographies(rH, math.ceil(LenimagesGray / 2) - 1)
@@ -553,7 +553,7 @@ def generatePanorama(path):
         h, maxInlier = ransacHomography(pos1, pos2, 1000, 1)
         rH.append(h)
 
-        # out = displayMatches(img1, img2, pos1, pos2, maxInlier)
+        #out = displayMatches(imagesGray[k], imagesGray[k+1], pos1, pos2, maxInlier)
         counter += 1
     # imList = [img1c, img2c, img3c]
     Hs = accumulateHomographies(rH, math.ceil(LenimagesGray / 2) - 1)
@@ -563,12 +563,14 @@ def generatePanorama(path):
     plt.imshow(out)
     plt.show()
 
-if _name_ == '_main_':
-    generatePanorama('C:\im') #give folder with pic to work on
-    # generatePanorama1()
-    # generatePanorama2()
-    # generatePanorama3()
-    # generatePanorama4()
-    # generatePanorama5()
-    # generatePanorama6()
+def main():
+    #generatePanorama('C:\im') #give folder with pic to work on
+    #generatePanorama1()
+    #generatePanorama2()
+    #generatePanorama3()
+    #generatePanorama4()
+    #generatePanorama5()
+    #generatePanorama6()
     # generatePanorama7() #with givan path
+
+main()
